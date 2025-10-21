@@ -1,0 +1,8 @@
+aiogram
+SQLAlchemy
+asyncpg
+greenlet
+python-docx
+python-dotenv
+pydantic
+aiofiles

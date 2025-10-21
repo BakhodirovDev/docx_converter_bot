@@ -1,0 +1,16 @@
+{
+  "start": "👋 Salom! Men DOCX fayllarni TXT formatga o‘tkazaman.",
+  "welcome_back": "👋 Qaytganingizdan xursandmiz!",
+  "choose_action": "Boshlash uchun quyidagi tugmani bosing.",
+  "convert_btn": "📄 DOCX → TXT Convertatsiya",
+  "offer_text": "📜 Quyidagi ommaviy oferta shartlarini o‘qib chiqing va tasdiqlang.",
+  "view_offer": "📜 Ommaviy ofertani ko‘rish",
+  "confirm": "✅ Tasdiqlayman",
+  "send_file": "📤 Endi DOCX faylni yuboring.",
+  "not_docx": "⚠️ Fayl DOCX formatda emas.",
+  "payment_title": "DOCX → TXT konvertatsiya",
+  "payment_desc": "Faylni konvertatsiya qilish xizmati",
+  "paid": "🔄 To‘lov qabul qilindi. Faylingiz konvertatsiya qilinmoqda...",
+  "done": "✅ Tayyor! Sizning faylingiz konvertatsiya qilindi.",
+  "error": "❌ Xatolik yuz berdi:"
+}

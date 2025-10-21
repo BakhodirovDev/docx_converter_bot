@@ -1,0 +1,16 @@
+{
+  "start": "Hello! I convert DOCX files to TXT format.",
+  "welcome_back": "Welcome back!",
+  "choose_action": "Press the button below to start.",
+  "convert_btn": "📄 DOCX → TXT Conversion",
+  "offer_text": "📜 Please read and confirm the terms of the public offer below.",
+  "view_offer": "📜 View Public Offer",
+  "confirm": "✅ I Confirm",
+  "send_file": "📤 Send a DOCX file.",
+  "not_docx": "⚠️ File is not in DOCX format.",
+  "payment_title": "DOCX → TXT Conversion",
+  "payment_desc": "File conversion service",
+  "paid": "🔄 Payment accepted. Your file is being converted...",
+  "done": "✅ Done! Your file has been converted.",
+  "error": "❌ An error occurred:"
+}
