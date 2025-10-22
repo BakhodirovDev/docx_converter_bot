@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, BigInteger, DateTime, Float
+from sqlalchemy import Column, Integer, String, Boolean, BigInteger, DateTime, Float, ForeignKey
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from datetime import datetime
 
 Base = declarative_base()
@@ -14,6 +14,13 @@ class User(Base):
     last_name = Column(String, nullable=True)
     language = Column(String(3), nullable=True)
     is_admin = Column(Boolean, default=False)
+    
+    # Referral system
+    referral_code = Column(String(20), unique=True, index=True, nullable=True)
+    referred_by = Column(BigInteger, ForeignKey("users.telegram_id"), nullable=True)
+    balance = Column(Float, default=0.0)
+    total_earned = Column(Float, default=0.0)  # Jami ishlab topgan pul
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Settings(Base):
@@ -22,6 +29,7 @@ class Settings(Base):
     uz_offer = Column(String)
     ru_offer = Column(String)
     en_offer = Column(String)
+    referral_reward = Column(Float, default=1000.0)  # Referal mukofoti
 
 
 class Payment(Base):
@@ -31,6 +39,16 @@ class Payment(Base):
     invoice_id = Column(String, unique=True, index=True)
     file_name = Column(String)
     amount = Column(Float)
+    payment_method = Column(String, default="click")  # click, balance
     status = Column(String, default="pending")  # pending, paid, failed
     created_at = Column(DateTime, default=datetime.utcnow)
     paid_at = Column(DateTime, nullable=True)
+
+
+class ReferralHistory(Base):
+    __tablename__ = "referral_history"
+    id = Column(Integer, primary_key=True)
+    referrer_id = Column(BigInteger, ForeignKey("users.telegram_id"), index=True)  # Kim taklif qilgan
+    referred_id = Column(BigInteger, ForeignKey("users.telegram_id"), index=True)  # Kim kelgan
+    reward_amount = Column(Float)  # Qancha pul berilgan
+    created_at = Column(DateTime, default=datetime.utcnow)

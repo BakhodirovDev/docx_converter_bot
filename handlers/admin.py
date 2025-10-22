@@ -12,6 +12,8 @@ from config import ADMIN_ID, FILE_PRICE
 class AdminStates(StatesGroup):
     waiting_for_link = State()
     selecting_language = State()
+    waiting_for_price = State()
+    waiting_for_referral_reward = State()
 
 
 router = Router()
@@ -32,10 +34,15 @@ async def admin_settings_handler(callback: CallbackQuery):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📜 Ommaviy Oferta", callback_data="admin_offer")],
         [InlineKeyboardButton(text="💰 Narx Sozlamalari", callback_data="admin_price")],
-        [InlineKeyboardButton(text="⚙️ Boshqa Sozlamalar", callback_data="admin_other")],
+        [InlineKeyboardButton(text="🎁 Referal Mukofoti", callback_data="admin_referral")],
+        [InlineKeyboardButton(text="📊 Referal Statistika", callback_data="admin_referral_stats")],
+        [InlineKeyboardButton(text="🏠 Asosiy Menyu", callback_data="back_to_menu")],
     ])
 
-    await callback.message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    try:
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    except:
+        await callback.message.answer(text, reply_markup=kb, parse_mode="Markdown")
     await callback.answer()
 
 
@@ -74,9 +81,13 @@ async def admin_offer_handler(callback: CallbackQuery):
         [InlineKeyboardButton(text="🇷🇺 Русский linkini o'zgartirish", callback_data="edit_ru")],
         [InlineKeyboardButton(text="🇬🇧 English linkini o'zgartirish", callback_data="edit_en")],
         [InlineKeyboardButton(text="◀️ Orqaga", callback_data="admin_settings")],
+        [InlineKeyboardButton(text="🏠 Asosiy Menyu", callback_data="back_to_menu")],
     ])
 
-    await callback.message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    try:
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    except:
+        await callback.message.answer(text, reply_markup=kb, parse_mode="Markdown")
     await callback.answer()
 
 
@@ -176,6 +187,7 @@ async def show_offer_menu(message: Message, settings: Settings):
         [InlineKeyboardButton(text="🇷🇺 Русский linkini o'zgartirish", callback_data="edit_ru")],
         [InlineKeyboardButton(text="🇬🇧 English linkini o'zgartirish", callback_data="edit_en")],
         [InlineKeyboardButton(text="◀️ Orqaga", callback_data="admin_settings")],
+        [InlineKeyboardButton(text="🏠 Asosiy Menyu", callback_data="back_to_menu")],
     ])
 
     await message.answer(text, reply_markup=kb, parse_mode="Markdown")
@@ -200,9 +212,13 @@ async def admin_price_handler(callback: CallbackQuery):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✏️ Narxni o'zgartirish", callback_data="edit_price")],
         [InlineKeyboardButton(text="◀️ Orqaga", callback_data="admin_settings")],
+        [InlineKeyboardButton(text="🏠 Asosiy Menyu", callback_data="back_to_menu")],
     ])
 
-    await callback.message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    try:
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    except:
+        await callback.message.answer(text, reply_markup=kb, parse_mode="Markdown")
     await callback.answer()
 
 
@@ -252,3 +268,185 @@ async def admin_notifications_handler(callback: CallbackQuery):
     text = "🔔 *Xabarlar Sozlamalari*\n\n🔄 Tez orada..."
     await callback.message.answer(text, parse_mode="Markdown")
     await callback.answer()
+
+
+# --- REFERAL MUKOFOTI SOZLAMALARI ---
+@router.callback_query(F.data == "admin_referral")
+async def admin_referral_handler(callback: CallbackQuery):
+    """Referal mukofoti sozlamalari"""
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Sizda bu bo'limga kirish huquqi yo'q.", show_alert=True)
+        return
+
+    async for session in get_session():
+        stmt = select(Settings).limit(1)
+        result = await session.execute(stmt)
+        settings = result.scalar_one_or_none()
+        
+        if not settings:
+            settings = Settings(
+                uz_offer="", 
+                ru_offer="", 
+                en_offer="",
+                referral_reward=1000.0
+            )
+            session.add(settings)
+            await session.commit()
+        
+        current_reward = settings.referral_reward or 1000.0
+
+    text = (
+        "🎁 *Referal Mukofoti Sozlamalari*\n\n"
+        f"💰 Hozirgi mukofot: {current_reward:,.0f} UZS\n\n"
+        "Har bir yangi foydalanuvchi referal havola orqali "
+        "qo'shilganda taklif qilgan odamga shu miqdor pul beriladi.\n\n"
+        "👇 O'zgartirish uchun tugmani bosing:"
+    )
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✏️ Mukofot miqdorini o'zgartirish", callback_data="edit_referral_reward")],
+        [InlineKeyboardButton(text="◀️ Orqaga", callback_data="admin_settings")],
+        [InlineKeyboardButton(text="🏠 Asosiy Menyu", callback_data="back_to_menu")],
+    ])
+
+    try:
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    except:
+        await callback.message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "edit_referral_reward")
+async def edit_referral_reward_callback(callback: CallbackQuery, state: FSMContext):
+    """Referal mukofot miqdorini o'zgartirish"""
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Sizda bu operatsiyaga huquqi yo'q.", show_alert=True)
+        return
+    
+    await state.set_state(AdminStates.waiting_for_referral_reward)
+    await callback.message.answer(
+        "💰 Yangi referal mukofot miqdorini so'ming birligida yuboring:\n\n"
+        "Masalan: 1000 (bir ming so'm)\n"
+        "yoki: 5000 (besh ming so'm)"
+    )
+    await callback.answer()
+
+
+@router.message(AdminStates.waiting_for_referral_reward)
+async def receive_referral_reward(message: Message, state: FSMContext):
+    """Referal mukofot miqdorini qabul qiladi va bazaga saqlaydi"""
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Sizda bu operatsiyaga huquqi yo'q.")
+        return
+    
+    try:
+        new_reward = float(message.text.strip())
+        
+        if new_reward < 0:
+            await message.answer("❌ Mukofot miqdori manfiy bo'lishi mumkin emas!")
+            return
+        
+        if new_reward > 1000000:
+            await message.answer("❌ Mukofot miqdori juda katta! 1,000,000 dan kam kiriting.")
+            return
+        
+        async for session in get_session():
+            stmt = select(Settings).limit(1)
+            result = await session.execute(stmt)
+            settings = result.scalar_one_or_none()
+            
+            if not settings:
+                settings = Settings(
+                    uz_offer="", 
+                    ru_offer="", 
+                    en_offer="",
+                    referral_reward=new_reward
+                )
+                session.add(settings)
+            else:
+                settings.referral_reward = new_reward
+            
+            await session.commit()
+        
+        await message.answer(
+            f"✅ Referal mukofot miqdori muvaffaqiyatli o'zgartirildi!\n\n"
+            f"💰 Yangi mukofot: {new_reward:,.0f} UZS\n\n"
+            f"Endi har bir yangi foydalanuvchi referal orqali qo'shilganda "
+            f"taklif qilgan odamga {new_reward:,.0f} so'm beriladi."
+        )
+    
+    except ValueError:
+        await message.answer(
+            "❌ Noto'g'ri format! Faqat raqam kiriting.\n\n"
+            "Masalan: 1000 yoki 5000"
+        )
+        return
+    except Exception as e:
+        await message.answer(f"❌ Xatolik: {e}")
+    
+    finally:
+        await state.clear()
+
+
+@router.callback_query(F.data.in_(["referral_stats", "admin_referral_stats"]))
+async def referral_stats_handler(callback: CallbackQuery):
+    """Referal statistika"""
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Sizda bu bo'limga kirish huquqi yo'q.", show_alert=True)
+        return
+    
+    from sqlalchemy import func
+    from database.models import User, ReferralHistory
+    
+    async for session in get_session():
+        # Jami referallar soni
+        total_referrals = await session.execute(select(func.count(ReferralHistory.id)))
+        total_count = total_referrals.scalar() or 0
+        
+        # Jami to'langan mukofot
+        total_rewards = await session.execute(select(func.sum(ReferralHistory.reward_amount)))
+        total_amount = total_rewards.scalar() or 0.0
+        
+        # Eng aktiv 5 referrer
+        top_referrers = await session.execute(
+            select(
+                User.telegram_id,
+                User.first_name,
+                User.username,
+                func.count(ReferralHistory.id).label('ref_count'),
+                func.sum(ReferralHistory.reward_amount).label('total_earned')
+            )
+            .join(ReferralHistory, ReferralHistory.referrer_id == User.telegram_id)
+            .group_by(User.telegram_id, User.first_name, User.username)
+            .order_by(func.count(ReferralHistory.id).desc())
+            .limit(5)
+        )
+        top_users = top_referrers.all()
+    
+    text = (
+        "📊 *Referal Statistika*\n\n"
+        f"👥 Jami referallar: {total_count}\n"
+        f"💰 Jami to'langan mukofot: {total_amount:,.0f} UZS\n\n"
+    )
+    
+    if top_users:
+        text += "🏆 *Top 5 Referrerlar:*\n\n"
+        for idx, (tid, fname, username, ref_count, earned) in enumerate(top_users, 1):
+            name = fname or username or f"ID{tid}"
+            text += f"{idx}. {name}\n"
+            text += f"   👥 {ref_count} ta referal\n"
+            text += f"   💰 {earned:,.0f} UZS\n\n"
+    else:
+        text += "📭 Hali referal yo'q"
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Orqaga", callback_data="admin_referral")],
+        [InlineKeyboardButton(text="🏠 Asosiy Menyu", callback_data="back_to_menu")],
+    ])
+    
+    try:
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    except:
+        await callback.message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+

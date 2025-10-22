@@ -8,9 +8,10 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPri
 from sqlalchemy.future import select
 from config import BOT_TOKEN, PROVIDER_TOKEN, FILE_PRICE, ADMIN_ID
 from database.db import get_session, engine
-from database.models import Base, User, Settings, Payment
+from database.models import Base, User, Settings, Payment, ReferralHistory
 from handlers.convert import convert_docx_to_txt
 from handlers.admin import router as admin_router
+from handlers.referral import generate_referral_code, extract_referral_code
 from utils import ensure_dir, validate_docx, get_text
 
 bot = Bot(BOT_TOKEN)
@@ -20,6 +21,9 @@ dp.include_router(admin_router)
 
 ensure_dir("files")
 
+# Bot ma'lumotlari (username uchun)
+BOT_INFO = None
+
 # Gruh fayllarni vaqtincha saqlash
 pending_group_files = {}
 # Gruh timeout tasklar
@@ -28,22 +32,36 @@ group_timeout_tasks = {}
 
 @dp.message(CommandStart())
 async def start(message: types.Message):
+    # Referal kodni ajratib olish
+    referral_code = extract_referral_code(message.text)
+    
     async for session in get_session():
         stmt = select(User).where(User.telegram_id == message.from_user.id)
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
 
-        #  Agar foydalanuvchi oldin ro''yxatdan o''tgan bo''lsa
+        # Agar foydalanuvchi oldin ro'yxatdan o'tgan bo'lsa
         if user and user.language:
             lang = user.language
             await send_main_menu(message, lang)
             return
 
-        #  Agar yangi foydalanuvchi bo''lsa yoki tili yo''q bo''lsa
+        # Yangi foydalanuvchi - referal kodni tekshirish
+        referred_by_id = None
+        if referral_code:
+            # Referal kod egasini topish
+            ref_stmt = select(User).where(User.referral_code == referral_code)
+            ref_result = await session.execute(ref_stmt)
+            referrer = ref_result.scalar_one_or_none()
+            
+            if referrer and referrer.telegram_id != message.from_user.id:
+                referred_by_id = referrer.telegram_id
+
+        # Agar yangi foydalanuvchi bo'lsa yoki tili yo'q bo'lsa
         lang_kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text=" O''zbek", callback_data="lang_uz"),
-            InlineKeyboardButton(text=" Русский", callback_data="lang_ru"),
-            InlineKeyboardButton(text=" English", callback_data="lang_en")
+            InlineKeyboardButton(text="🇺🇿 O'zbek", callback_data=f"lang_uz_{referred_by_id or 0}"),
+            InlineKeyboardButton(text="🇷🇺 Русский", callback_data=f"lang_ru_{referred_by_id or 0}"),
+            InlineKeyboardButton(text="🇬🇧 English", callback_data=f"lang_en_{referred_by_id or 0}")
         ]])
         await message.answer(
             "Tilni tanlang / Выберите язык / Choose language:",
@@ -54,7 +72,9 @@ async def start(message: types.Message):
 # --- Tilni saqlash ---
 @dp.callback_query(F.data.startswith("lang_"))
 async def set_language(callback: types.CallbackQuery):
-    lang = callback.data.split("_")[1]
+    parts = callback.data.split("_")
+    lang = parts[1]
+    referred_by_id = int(parts[2]) if len(parts) > 2 else 0
 
     async for session in get_session():
         stmt = select(User).where(User.telegram_id == callback.from_user.id)
@@ -62,17 +82,66 @@ async def set_language(callback: types.CallbackQuery):
         user = result.scalar_one_or_none()
 
         if not user:
+            # Yangi foydalanuvchi - referal kod yaratish
+            new_referral_code = generate_referral_code()
+            
+            # Unique ekanligini tekshirish
+            while True:
+                check_stmt = select(User).where(User.referral_code == new_referral_code)
+                check_result = await session.execute(check_stmt)
+                if not check_result.scalar_one_or_none():
+                    break
+                new_referral_code = generate_referral_code()
+            
             user = User(
                 telegram_id=callback.from_user.id,
                 username=callback.from_user.username,
                 first_name=callback.from_user.first_name,
                 last_name=callback.from_user.last_name,
-                language=lang
+                language=lang,
+                referral_code=new_referral_code,
+                referred_by=referred_by_id if referred_by_id != 0 else None
             )
             session.add(user)
+            await session.commit()
+            
+            # Agar referal orqali kelgan bo'lsa - mukofot berish
+            if referred_by_id and referred_by_id != 0:
+                # Settings dan referal mukofot summasini olish
+                settings_stmt = select(Settings).limit(1)
+                settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+                reward = settings.referral_reward if settings else 1000.0
+                
+                # Referer ga pul qo'shish
+                referrer_stmt = select(User).where(User.telegram_id == referred_by_id)
+                referrer_result = await session.execute(referrer_stmt)
+                referrer = referrer_result.scalar_one_or_none()
+                
+                if referrer:
+                    referrer.balance += reward
+                    referrer.total_earned += reward
+                    
+                    # ReferralHistory ga yozish
+                    ref_history = ReferralHistory(
+                        referrer_id=referred_by_id,
+                        referred_id=callback.from_user.id,
+                        reward_amount=reward
+                    )
+                    session.add(ref_history)
+                    await session.commit()
+                    
+                    # Referrer ga xabar yuborish
+                    try:
+                        await bot.send_message(
+                            referred_by_id,
+                            f"🎉 Yangi foydalanuvchi sizning havolangiz orqali qo'shildi!\n"
+                            f"💰 Balansingizga +{reward:,.0f} UZS qo'shildi"
+                        )
+                    except:
+                        pass
         else:
             user.language = lang
-        await session.commit()
+            await session.commit()
 
     await callback.answer()
     await send_main_menu(callback.message, lang)
@@ -80,12 +149,14 @@ async def set_language(callback: types.CallbackQuery):
 
 async def send_main_menu(message: types.Message, lang: str):
     buttons = [
-        [InlineKeyboardButton(text=get_text(lang, "convert_btn"), callback_data="start_convert")]
+        [InlineKeyboardButton(text=get_text(lang, "convert_btn"), callback_data="start_convert")],
+        [InlineKeyboardButton(text=get_text(lang, "referral_btn"), callback_data="my_referral")],
+        [InlineKeyboardButton(text=get_text(lang, "profile_btn"), callback_data="my_profile")]
     ]
 
-    # Faqat admin uchun tugma qo''shamiz
+    # Faqat admin uchun tugma qo'shamiz
     if message.from_user.id == ADMIN_ID:
-        buttons.append([InlineKeyboardButton(text=" Admin Sozlamalar", callback_data="admin_settings")])
+        buttons.append([InlineKeyboardButton(text="⚙️ Admin Panel", callback_data="admin_settings")])
 
     main_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -93,6 +164,128 @@ async def send_main_menu(message: types.Message, lang: str):
         f"{get_text(lang, 'start')}\n\n{get_text(lang, 'choose_action')}",
         reply_markup=main_kb
     )
+
+
+# --- Profil ko'rsatish ---
+@dp.callback_query(F.data == "my_profile")
+async def show_profile(callback: types.CallbackQuery):
+    async for session in get_session():
+        stmt = select(User).where(User.telegram_id == callback.from_user.id)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            await callback.answer("❌ Foydalanuvchi topilmadi", show_alert=True)
+            return
+        
+        lang = user.language or "uz"
+        
+        # Referal statistikasi
+        from sqlalchemy import func
+        ref_count_stmt = select(func.count(User.id)).where(User.referred_by == user.telegram_id)
+        ref_count = (await session.execute(ref_count_stmt)).scalar() or 0
+        
+        profile_text = get_text(lang, "profile_text").format(
+            name=user.first_name or "User",
+            username=f"@{user.username}" if user.username else "—",
+            balance=user.balance or 0,
+            total_earned=user.total_earned or 0,
+            referrals=ref_count,
+            ref_code=user.referral_code or "—"
+        )
+        
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🏠 " + get_text(lang, "back_to_menu"), callback_data="back_to_menu")]
+        ])
+        
+        try:
+            await callback.message.edit_text(profile_text, reply_markup=kb, parse_mode="HTML")
+        except:
+            await callback.message.answer(profile_text, reply_markup=kb, parse_mode="HTML")
+        await callback.answer()
+
+
+# --- Referal havolani ko'rsatish ---
+@dp.callback_query(F.data == "my_referral")
+async def show_referral(callback: types.CallbackQuery):
+    global BOT_INFO
+    
+    async for session in get_session():
+        stmt = select(User).where(User.telegram_id == callback.from_user.id)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            await callback.answer("❌ Foydalanuvchi topilmadi", show_alert=True)
+            return
+        
+        lang = user.language or "uz"
+        
+        # Referal statistikasi
+        from sqlalchemy import func
+        ref_count_stmt = select(func.count(User.id)).where(User.referred_by == user.telegram_id)
+        ref_count = (await session.execute(ref_count_stmt)).scalar() or 0
+        
+        # Settings dan referal mukofotini olish
+        settings_stmt = select(Settings).limit(1)
+        settings = (await session.execute(settings_stmt)).scalar_one_or_none()
+        reward = settings.referral_reward if settings else 1000.0
+        
+        # Bot username olish (cache qilish)
+        if not BOT_INFO:
+            BOT_INFO = await bot.get_me()
+        
+        ref_link = f"https://t.me/{BOT_INFO.username}?start={user.referral_code}"
+        
+        referral_text = get_text(lang, "referral_text").format(
+            link=ref_link,
+            reward=f"{reward:,.0f}",
+            count=ref_count,
+            earned=f"{user.total_earned or 0:,.0f}"
+        )
+        
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🏠 " + get_text(lang, "back_to_menu"), callback_data="back_to_menu")]
+        ])
+        
+        try:
+            await callback.message.edit_text(referral_text, reply_markup=kb, parse_mode="HTML")
+        except:
+            await callback.message.answer(referral_text, reply_markup=kb, parse_mode="HTML")
+        await callback.answer()
+
+
+# --- Asosiy menyuga qaytish ---
+@dp.callback_query(F.data == "back_to_menu")
+async def back_to_menu(callback: types.CallbackQuery):
+    async for session in get_session():
+        stmt = select(User.language).where(User.telegram_id == callback.from_user.id)
+        lang = (await session.execute(stmt)).scalar() or "uz"
+    
+    # Menyuni edit qilamiz
+    buttons = [
+        [InlineKeyboardButton(text=get_text(lang, "convert_btn"), callback_data="start_convert")],
+        [InlineKeyboardButton(text=get_text(lang, "referral_btn"), callback_data="my_referral")],
+        [InlineKeyboardButton(text=get_text(lang, "profile_btn"), callback_data="my_profile")]
+    ]
+
+    # Faqat admin uchun tugma qo'shamiz
+    if callback.from_user.id == ADMIN_ID:
+        buttons.append([InlineKeyboardButton(text="⚙️ Admin Panel", callback_data="admin_settings")])
+
+    main_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    try:
+        await callback.message.edit_text(
+            f"{get_text(lang, 'start')}\n\n{get_text(lang, 'choose_action')}",
+            reply_markup=main_kb
+        )
+    except:
+        await callback.message.answer(
+            f"{get_text(lang, 'start')}\n\n{get_text(lang, 'choose_action')}",
+            reply_markup=main_kb
+        )
+    await callback.answer()
 
 
 # --- Ommaviy oferta ---
@@ -109,9 +302,14 @@ async def confirm_offer(callback: types.CallbackQuery):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=get_text(lang, "view_offer"), url=offer_url)],
         [InlineKeyboardButton(text=get_text(lang, "confirm"), callback_data="confirm_offer")],
+        [InlineKeyboardButton(text="🏠 " + get_text(lang, "back_to_menu"), callback_data="back_to_menu")]
     ])
 
-    await callback.message.answer(get_text(lang, "offer_text"), reply_markup=kb)
+    try:
+        await callback.message.edit_text(get_text(lang, "offer_text"), reply_markup=kb)
+    except:
+        await callback.message.answer(get_text(lang, "offer_text"), reply_markup=kb)
+    await callback.answer()
 
 
 # --- Faylni so''rash ---
@@ -120,6 +318,8 @@ async def ask_file(callback: types.CallbackQuery):
     async for session in get_session():
         stmt = select(User.language).where(User.telegram_id == callback.from_user.id)
         lang = (await session.execute(stmt)).scalar() or "uz"
+    
+    await callback.answer()
     await callback.message.answer(get_text(lang, "send_file"))
 
 
@@ -354,11 +554,16 @@ def get_offer_link(lang: str, settings: Settings | None) -> str:
 
 
 async def main():
+    global BOT_INFO
+    
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print(" Bot ishga tushdi...")
+    
+    # Bot ma'lumotlarini olish
+    BOT_INFO = await bot.get_me()
+    print(f"✅ Bot ishga tushdi... (@{BOT_INFO.username})")
+    
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
