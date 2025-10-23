@@ -23,5 +23,17 @@
   "referral_text": "🎁 <b>Реферальная программа</b>\n\n🔗 Ваша реферальная ссылка:\n{link}\n\nПриглашайте друзей и получайте {reward} UZS за каждого!\n\n📊 Статистика:\n👥 Приглашено: {count} чел.\n💰 Всего заработано: {earned} UZS",
   "profile_btn": "👤 Мой профиль",
   "profile_text": "👤 <b>Профиль</b>\n\n📝 Имя: {name}\n🆔 Username: {username}\n💰 Баланс: {balance:,.0f} UZS\n💵 Всего заработано: {total_earned:,.0f} UZS\n👥 Рефералов: {referrals} чел.\n🔑 Реферальный код: <code>{ref_code}</code>",
-  "back_to_menu": "Главное меню"
+  "back_to_menu": "Главное меню",
+  "must_subscribe": "📢 <b>Подпишитесь на канал!</b>\n\nДля использования бота необходимо подписаться на канал:",
+  "subscribe_btn": "📢 Подписаться на канал",
+  "check_subscription": "✅ Проверить подписку",
+  "not_subscribed": "❌ Вы еще не подписались на канал!\n\nПожалуйста, сначала подпишитесь на канал, а затем нажмите \"Проверить подписку\".",
+  "file_ready": "📄 Файл готов!",
+  "converted_via": "✅ Конвертировано через {bot_name}",
+  "payment_method_select": "💳 <b>Выберите способ оплаты</b>\n\n💰 Ваш баланс: {balance:,.0f} UZS\n📄 Цена файла: {price:,.0f} UZS",
+  "payment_partial": "💳 <b>Выберите способ оплаты</b>\n\n💰 Ваш баланс: {balance:,.0f} UZS\n📄 Цена файла: {price:,.0f} UZS\n\n⚠️ Не хватает {remaining:,.0f} UZS",
+  "use_full_balance": "💰 Оплатить с баланса ({balance:,.0f} UZS)",
+  "use_partial_balance": "💰 Частично: Баланс ({balance:,.0f}) + Click ({remaining:,.0f})",
+  "use_only_click": "💳 Оплатить только через Click",
+  "payment_timeout": "⏰ Время оплаты истекло!\n\n❌ Файлы удалены, так как оплата не была произведена в течение 30 минут.\n\nПожалуйста, отправьте файлы снова и произведите оплату."
 }

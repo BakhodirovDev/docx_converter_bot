@@ -23,5 +23,17 @@
   "referral_text": "🎁 <b>Referal dasturi</b>\n\n🔗 Sizning referal havolangiz:\n{link}\n\nDo'stlaringizni taklif qiling va har biriga {reward} UZS oling!\n\n📊 Statistika:\n👥 Taklif qilganlar: {count} ta\n💰 Jami ishlab topilgan: {earned} UZS",
   "profile_btn": "👤 Mening profilim",
   "profile_text": "👤 <b>Profil</b>\n\n📝 Ism: {name}\n🆔 Username: {username}\n💰 Balans: {balance:,.0f} UZS\n💵 Jami ishlab topilgan: {total_earned:,.0f} UZS\n👥 Referal soni: {referrals} ta\n🔑 Referal kod: <code>{ref_code}</code>",
-  "back_to_menu": "Asosiy menyu"
+  "back_to_menu": "Asosiy menyu",
+  "must_subscribe": "📢 <b>Kanalga obuna bo'ling!</b>\n\nBotdan foydalanish uchun quyidagi kanalga obuna bo'lishingiz kerak:",
+  "subscribe_btn": "📢 Kanalga obuna bo'lish",
+  "check_subscription": "✅ Obunani tekshirish",
+  "not_subscribed": "❌ Siz hali kanalga obuna bo'lmadingiz!\n\nIltimos, avval kanalga obuna bo'ling va keyin \"Obunani tekshirish\" tugmasini bosing.",
+  "file_ready": "📄 Fayl tayyor!",
+  "converted_via": "✅ {bot_name} orqali konvertatsiya qilindi",
+  "payment_method_select": "💳 <b>To'lov turini tanlang</b>\n\n💰 Bot balansingiz: {balance:,.0f} UZS\n📄 Fayl narxi: {price:,.0f} UZS",
+  "payment_partial": "💳 <b>To'lov turini tanlang</b>\n\n💰 Bot balansingiz: {balance:,.0f} UZS\n📄 Fayl narxi: {price:,.0f} UZS\n\n⚠️ Balansda {remaining:,.0f} UZS yetishmaydi",
+  "use_full_balance": "💰 Balansdan to'lash ({balance:,.0f} UZS)",
+  "use_partial_balance": "💰 Qisman: Balans ({balance:,.0f}) + Click ({remaining:,.0f})",
+  "use_only_click": "💳 Faqat Click orqali to'lash",
+  "payment_timeout": "⏰ To'lov vaqti tugadi!\n\n❌ 30 daqiqa ichida to'lov qilmaganingiz uchun fayllar o'chirib yuborildi.\n\nIltimos, qaytadan fayllarni yuboring va to'lovni amalga oshiring."
 }

@@ -23,5 +23,17 @@
   "referral_text": "🎁 <b>Referral Program</b>\n\n🔗 Your referral link:\n{link}\n\nInvite friends and earn {reward} UZS for each!\n\n📊 Statistics:\n👥 Invited: {count}\n💰 Total earned: {earned} UZS",
   "profile_btn": "👤 My Profile",
   "profile_text": "👤 <b>Profile</b>\n\n📝 Name: {name}\n🆔 Username: {username}\n💰 Balance: {balance:,.0f} UZS\n💵 Total earned: {total_earned:,.0f} UZS\n👥 Referrals: {referrals}\n🔑 Referral code: <code>{ref_code}</code>",
-  "back_to_menu": "Main menu"
+  "back_to_menu": "Main menu",
+  "must_subscribe": "📢 <b>Subscribe to the channel!</b>\n\nTo use the bot, you need to subscribe to the channel:",
+  "subscribe_btn": "📢 Subscribe to channel",
+  "check_subscription": "✅ Check subscription",
+  "not_subscribed": "❌ You haven't subscribed to the channel yet!\n\nPlease subscribe to the channel first, then click \"Check subscription\".",
+  "file_ready": "📄 File ready!",
+  "converted_via": "✅ Converted via {bot_name}",
+  "payment_method_select": "💳 <b>Choose payment method</b>\n\n💰 Your balance: {balance:,.0f} UZS\n📄 File price: {price:,.0f} UZS",
+  "payment_partial": "💳 <b>Choose payment method</b>\n\n💰 Your balance: {balance:,.0f} UZS\n📄 File price: {price:,.0f} UZS\n\n⚠️ Missing {remaining:,.0f} UZS",
+  "use_full_balance": "💰 Pay from balance ({balance:,.0f} UZS)",
+  "use_partial_balance": "💰 Partial: Balance ({balance:,.0f}) + Click ({remaining:,.0f})",
+  "use_only_click": "💳 Pay only via Click",
+  "payment_timeout": "⏰ Payment time expired!\n\n❌ Files have been deleted because payment was not made within 30 minutes.\n\nPlease send the files again and make the payment."
 }

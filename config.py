@@ -12,6 +12,9 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 FILE_PRICE = int(os.getenv("FILE_PRICE", "5000"))
 PROVIDER_TOKEN = os.getenv("PROVIDER_TOKEN")
 
+# Majburiy obuna kanali (@ belgisiz, masalan: oxu_docx_channel)
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "")  # .env ga qo'shish kerak
+
 # PostgreSQL connection — passwordni URL-encode qilish
 pg_user = os.getenv("POSTGRES_USER", "postgres")
 pg_password = os.getenv("POSTGRES_PASSWORD", "")

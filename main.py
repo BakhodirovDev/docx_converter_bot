@@ -6,7 +6,7 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice
 from sqlalchemy.future import select
-from config import BOT_TOKEN, PROVIDER_TOKEN, FILE_PRICE, ADMIN_ID
+from config import BOT_TOKEN, PROVIDER_TOKEN, FILE_PRICE, ADMIN_ID, CHANNEL_USERNAME
 from database.db import get_session, engine
 from database.models import Base, User, Settings, Payment, ReferralHistory
 from handlers.convert import convert_docx_to_txt
@@ -28,6 +28,52 @@ BOT_INFO = None
 pending_group_files = {}
 # Gruh timeout tasklar
 group_timeout_tasks = {}
+# To'lov timeout tasklar (30 daqiqa)
+payment_timeout_tasks = {}
+
+
+# Kanal obunasini tekshirish funksiyasi
+async def check_subscription(user_id: int) -> bool:
+    """Foydalanuvchi kanalga obuna ekanligini tekshiradi"""
+    if not CHANNEL_USERNAME:
+        return True  # Agar kanal sozlanmagan bo'lsa, barchaga ruxsat
+    
+    try:
+        member = await bot.get_chat_member(chat_id=f"@{CHANNEL_USERNAME}", user_id=user_id)
+        # status: creator, administrator, member - obuna bo'lgan
+        # left, kicked - obuna bo'lmagan
+        return member.status in ["creator", "administrator", "member"]
+    except Exception as e:
+        print(f"Obuna tekshiruv xatosi: {e}")
+        return False
+
+
+async def send_subscription_required(message: types.Message, lang: str):
+    """Kanal obunasi talab qilinganini ko'rsatadi"""
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=get_text(lang, "subscribe_btn"), url=f"https://t.me/{CHANNEL_USERNAME}")],
+        [InlineKeyboardButton(text=get_text(lang, "check_subscription"), callback_data="check_sub")]
+    ])
+    
+    await message.answer(get_text(lang, "must_subscribe"), reply_markup=kb, parse_mode="HTML")
+
+
+# Obunani tekshirish callback
+@dp.callback_query(F.data == "check_sub")
+async def check_subscription_callback(callback: types.CallbackQuery):
+    """Obunani tekshirish tugmasi bosilganda"""
+    async for session in get_session():
+        stmt = select(User.language).where(User.telegram_id == callback.from_user.id)
+        lang = (await session.execute(stmt)).scalar() or "uz"
+    
+    if await check_subscription(callback.from_user.id):
+        # Obuna bo'lgan - asosiy menyuni yuborish
+        await callback.answer("✅")
+        await callback.message.delete()
+        await send_main_menu(callback.message, lang)
+    else:
+        # Hali obuna bo'lmagan
+        await callback.answer(get_text(lang, "not_subscribed"), show_alert=True)
 
 
 @dp.message(CommandStart())
@@ -42,6 +88,12 @@ async def start(message: types.Message):
 
         # Agar foydalanuvchi oldin ro'yxatdan o'tgan bo'lsa
         if user and user.language:
+            # Kanal obunasini tekshirish
+            if not await check_subscription(message.from_user.id):
+                lang = user.language
+                await send_subscription_required(message, lang)
+                return
+            
             lang = user.language
             await send_main_menu(message, lang)
             return
@@ -75,6 +127,12 @@ async def set_language(callback: types.CallbackQuery):
     parts = callback.data.split("_")
     lang = parts[1]
     referred_by_id = int(parts[2]) if len(parts) > 2 else 0
+    
+    # Obunani tekshirish
+    if not await check_subscription(callback.from_user.id):
+        await callback.answer()
+        await send_subscription_required(callback.message, lang)
+        return
 
     async for session in get_session():
         stmt = select(User).where(User.telegram_id == callback.from_user.id)
@@ -169,6 +227,17 @@ async def send_main_menu(message: types.Message, lang: str):
 # --- Profil ko'rsatish ---
 @dp.callback_query(F.data == "my_profile")
 async def show_profile(callback: types.CallbackQuery):
+    # Obunani tekshirish
+    if not await check_subscription(callback.from_user.id):
+        async for session in get_session():
+            stmt = select(User).where(User.telegram_id == callback.from_user.id)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+            lang = user.language if user else "uz"
+        await callback.answer()
+        await send_subscription_required(callback.message, lang)
+        return
+    
     async for session in get_session():
         stmt = select(User).where(User.telegram_id == callback.from_user.id)
         result = await session.execute(stmt)
@@ -209,6 +278,17 @@ async def show_profile(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "my_referral")
 async def show_referral(callback: types.CallbackQuery):
     global BOT_INFO
+    
+    # Obunani tekshirish
+    if not await check_subscription(callback.from_user.id):
+        async for session in get_session():
+            stmt = select(User).where(User.telegram_id == callback.from_user.id)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+            lang = user.language if user else "uz"
+        await callback.answer()
+        await send_subscription_required(callback.message, lang)
+        return
     
     async for session in get_session():
         stmt = select(User).where(User.telegram_id == callback.from_user.id)
@@ -258,6 +338,17 @@ async def show_referral(callback: types.CallbackQuery):
 # --- Asosiy menyuga qaytish ---
 @dp.callback_query(F.data == "back_to_menu")
 async def back_to_menu(callback: types.CallbackQuery):
+    # Obunani tekshirish
+    if not await check_subscription(callback.from_user.id):
+        async for session in get_session():
+            stmt = select(User).where(User.telegram_id == callback.from_user.id)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+            lang = user.language if user else "uz"
+        await callback.answer()
+        await send_subscription_required(callback.message, lang)
+        return
+    
     async for session in get_session():
         stmt = select(User.language).where(User.telegram_id == callback.from_user.id)
         lang = (await session.execute(stmt)).scalar() or "uz"
@@ -291,6 +382,17 @@ async def back_to_menu(callback: types.CallbackQuery):
 # --- Ommaviy oferta ---
 @dp.callback_query(F.data == "start_convert")
 async def confirm_offer(callback: types.CallbackQuery):
+    # Obunani tekshirish
+    if not await check_subscription(callback.from_user.id):
+        async for session in get_session():
+            stmt = select(User).where(User.telegram_id == callback.from_user.id)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+            lang = user.language if user else "uz"
+        await callback.answer()
+        await send_subscription_required(callback.message, lang)
+        return
+    
     async for session in get_session():
         user_lang_stmt = select(User.language).where(User.telegram_id == callback.from_user.id)
         lang = (await session.execute(user_lang_stmt)).scalar() or "uz"
@@ -335,7 +437,11 @@ async def handle_file(message: types.Message):
         await message.answer(get_text(lang, "not_docx"))
         return
 
-    file_path = f"files/{message.from_user.id}_{doc.file_name}"
+    # User ID bo'yicha papka yaratish
+    user_folder = f"files/{message.from_user.id}"
+    ensure_dir(user_folder)
+    
+    file_path = f"{user_folder}/{doc.file_name}"
     
     try:
         # Faylni yuklab olish
@@ -371,12 +477,25 @@ async def handle_file(message: types.Message):
         file_count = len(pending_group_files[key]["files"])
         await message.answer(f"📁 Fayl qabul qilindi ({file_count}/...)")
         
-        # Timeout - 3 sekund kutib, yangi fayl kelmasa invoice yubor
+        # Timeout - 3 sekund kutib, yangi fayl kelmasa invoice yubor yoki admin bo'lsa konvertatsiya qil
         async def process_group_after_delay():
             try:
                 await asyncio.sleep(3.0)  # 3 sekund kutish
                 if key in pending_group_files:
-                    await send_group_invoice(key, lang)
+                    # Admin uchun to'lovsiz konvertatsiya
+                    if message.from_user.id == ADMIN_ID:
+                        data = pending_group_files.get(key)
+                        if data:
+                            files_to_convert = data.get("files", [])
+                            await process_conversion(message, files_to_convert, lang)
+                            # Pending groupni tozalash
+                            if key in pending_group_files:
+                                del pending_group_files[key]
+                            if key in group_timeout_tasks:
+                                del group_timeout_tasks[key]
+                    else:
+                        # Oddiy user uchun to'lov so'rash
+                        await send_group_invoice(key, lang)
             except asyncio.CancelledError:
                 pass  # Task bekor qilindi, yangi fayllar kelmoqda
             except Exception as e:
@@ -395,7 +514,7 @@ async def handle_file(message: types.Message):
 
 
 async def send_group_invoice(key: str, lang: str):
-    """Gruh fayllar uchun birlashtirilgan invoice yuboradi"""
+    """Gruh fayllar uchun to'lov manbai tanlash yoki invoice yuboradi"""
     import json
     import uuid
     
@@ -413,45 +532,113 @@ async def send_group_invoice(key: str, lang: str):
         # Invoice ID ni data ga qo'shish (keyinchalik topish uchun)
         data["invoice_id"] = invoice_id
         
-        # JSON payload (128 bayt chegarasida)
-        payload = json.dumps({
-            "invoice_id": invoice_id,
-            "is_group": True,
-            "count": file_count
-        })
+        # User balansini olish
+        user_id_str = key.split("_")[0]
+        telegram_id = int(user_id_str)
         
-        prices = [LabeledPrice(label=f"{file_count}ta fayl", amount=total_price * 100)]
+        async for session in get_session():
+            stmt = select(User).where(User.telegram_id == telegram_id)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+            user_balance = user.balance if user else 0.0
         
-        if not PROVIDER_TOKEN:
-            raise ValueError("PROVIDER_TOKEN is not configured in .env file")
-        
-        await bot.send_invoice(
-            chat_id=data["chat_id"],
-            title=get_text(lang, "payment_title"),
-            description=f"{file_count}ta fayl konvertatsiyasi",
-            provider_token=PROVIDER_TOKEN,
-            currency="UZS",
-            prices=prices,
-            payload=payload
-        )
-        
-        # Payment recordini database ga saqlash
-        try:
-            user_id_str = key.split("_")[0]
-            telegram_id = int(user_id_str)
+        # To'lov manbai tanlash
+        if user_balance >= total_price:
+            # To'liq balansdan to'lash mumkin
+            text = get_text(lang, "payment_method_select").format(
+                balance=user_balance,
+                price=total_price
+            )
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text=get_text(lang, "use_full_balance").format(balance=total_price),
+                    callback_data=f"pay_balance_{invoice_id}"
+                )],
+                [InlineKeyboardButton(
+                    text=get_text(lang, "use_only_click"),
+                    callback_data=f"pay_click_{invoice_id}"
+                )]
+            ])
+            await bot.send_message(data["chat_id"], text, reply_markup=kb, parse_mode="HTML")
             
-            async for session in get_session():
-                payment = Payment(
-                    telegram_id=telegram_id,
-                    invoice_id=invoice_id,
-                    file_name=f"{file_count} files",
-                    amount=total_price,
-                    status="pending"
-                )
-                session.add(payment)
-                await session.commit()
-        except (ValueError, IndexError) as e:
-            print(f"Payment save error: key={key}, error={e}")
+        elif user_balance > 0 and (total_price - user_balance) >= 1000:
+            # Qisman to'lov (balans + Click)
+            remaining = total_price - user_balance
+            text = get_text(lang, "payment_partial").format(
+                balance=user_balance,
+                price=total_price,
+                remaining=remaining
+            )
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text=get_text(lang, "use_partial_balance").format(
+                        balance=user_balance,
+                        remaining=remaining
+                    ),
+                    callback_data=f"pay_partial_{invoice_id}"
+                )],
+                [InlineKeyboardButton(
+                    text=get_text(lang, "use_only_click"),
+                    callback_data=f"pay_click_{invoice_id}"
+                )]
+            ])
+            await bot.send_message(data["chat_id"], text, reply_markup=kb, parse_mode="HTML")
+            
+        else:
+            # Faqat Click (balans 0 yoki yetarli emas)
+            await send_click_invoice(invoice_id, total_price, file_count, lang, data["chat_id"])
+        
+        # 30 daqiqalik to'lov timeout yaratish
+        async def payment_timeout_handler():
+            try:
+                await asyncio.sleep(1800)  # 30 daqiqa = 1800 sekund
+                if key in pending_group_files:
+                    # Fayllarni o'chirish
+                    data = pending_group_files.get(key)
+                    if data:
+                        files_to_delete = data.get("files", [])
+                        for file_path in files_to_delete:
+                            try:
+                                import os
+                                if os.path.exists(file_path):
+                                    os.remove(file_path)
+                                # TXT faylni ham o'chirish
+                                txt_path = file_path.replace(".docx", ".txt")
+                                if os.path.exists(txt_path):
+                                    os.remove(txt_path)
+                            except Exception as e:
+                                print(f"Fayl o'chirishda xatolik: {e}")
+                        
+                        # User papkasini o'chirish (bo'sh bo'lsa)
+                        try:
+                            user_folder = f"files/{telegram_id}"
+                            if os.path.exists(user_folder) and not os.listdir(user_folder):
+                                os.rmdir(user_folder)
+                        except Exception as e:
+                            print(f"Papka o'chirishda xatolik: {e}")
+                        
+                        # Userga xabar yuborish
+                        try:
+                            await bot.send_message(telegram_id, get_text(lang, "payment_timeout"))
+                        except:
+                            pass
+                    
+                    # Pending groupni tozalash
+                    if key in pending_group_files:
+                        del pending_group_files[key]
+                    if key in group_timeout_tasks:
+                        del group_timeout_tasks[key]
+                    if key in payment_timeout_tasks:
+                        del payment_timeout_tasks[key]
+            except asyncio.CancelledError:
+                pass  # Task bekor qilindi (to'lov amalga oshirildi)
+            except Exception as e:
+                print(f"Payment timeout xatosi: {e}")
+        
+        # Timeout taskni ishga tushirish
+        timeout_task = asyncio.create_task(payment_timeout_handler())
+        payment_timeout_tasks[key] = timeout_task
+        
     except Exception as e:
         print(f"Invoice yuborishda xatolik: {type(e).__name__}: {e}")
         # Faqat error bo'lsa pending groupni o'chirish
@@ -459,6 +646,223 @@ async def send_group_invoice(key: str, lang: str):
             del pending_group_files[key]
         if key in group_timeout_tasks:
             del group_timeout_tasks[key]
+
+
+async def send_click_invoice(invoice_id: str, total_price: float, file_count: int, lang: str, chat_id: int):
+    """Click orqali to'lov invoice yuboradi"""
+    import json
+    
+    # JSON payload (128 bayt chegarasida)
+    payload = json.dumps({
+        "invoice_id": invoice_id,
+        "is_group": True,
+        "count": file_count,
+        "payment_method": "click"
+    })
+    
+    prices = [LabeledPrice(label=f"{file_count}ta fayl", amount=int(total_price * 100))]
+    
+    if not PROVIDER_TOKEN:
+        raise ValueError("PROVIDER_TOKEN is not configured in .env file")
+    
+    await bot.send_invoice(
+        chat_id=chat_id,
+        title=get_text(lang, "payment_title"),
+        description=f"{file_count}ta fayl konvertatsiyasi",
+        provider_token=PROVIDER_TOKEN,
+        currency="UZS",
+        prices=prices,
+        payload=payload
+    )
+    
+    # Payment recordini database ga saqlash
+    try:
+        async for session in get_session():
+            payment = Payment(
+                telegram_id=chat_id,
+                invoice_id=invoice_id,
+                file_name=f"{file_count} files",
+                amount=total_price,
+                status="pending"
+            )
+            session.add(payment)
+            await session.commit()
+    except Exception as e:
+        print(f"Payment save error: invoice_id={invoice_id}, error={e}")
+
+
+# --- To'lov manbai callback handlerlari ---
+@dp.callback_query(F.data.startswith("pay_balance_"))
+async def pay_with_balance(callback: types.CallbackQuery):
+    """Faqat balansdan to'lash"""
+    invoice_id = callback.data.split("pay_balance_")[1]
+    
+    async for session in get_session():
+        stmt = select(User.language).where(User.telegram_id == callback.from_user.id)
+        lang = (await session.execute(stmt)).scalar() or "uz"
+    
+    # Invoice topish
+    files_to_convert = []
+    key_to_delete = None
+    total_price = 0
+    
+    for key, group_data in list(pending_group_files.items()):
+        if group_data.get("invoice_id") == invoice_id:
+            files_to_convert = group_data.get("files", [])
+            total_price = group_data.get("total_price", 0)
+            key_to_delete = key
+            break
+    
+    if not files_to_convert:
+        await callback.answer("❌ Fayllar topilmadi", show_alert=True)
+        return
+    
+    # Balansdan pul yechish
+    async for session in get_session():
+        stmt = select(User).where(User.telegram_id == callback.from_user.id)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if not user or user.balance < total_price:
+            await callback.answer("❌ Balansda mablag' yetarli emas", show_alert=True)
+            return
+        
+        user.balance -= total_price
+        await session.commit()
+    
+    await callback.answer("✅ To'lov muvaffaqiyatli")
+    await callback.message.delete()
+    await callback.message.answer(get_text(lang, "paid"))
+    
+    # Payment timeout taskni bekor qilish
+    if key_to_delete and key_to_delete in payment_timeout_tasks:
+        payment_timeout_tasks[key_to_delete].cancel()
+        del payment_timeout_tasks[key_to_delete]
+    
+    # Fayllarni konvertatsiya qilish
+    await process_conversion(callback.message, files_to_convert, lang)
+    
+    # Pending groupni tozalash
+    if key_to_delete:
+        if key_to_delete in pending_group_files:
+            del pending_group_files[key_to_delete]
+        if key_to_delete in group_timeout_tasks:
+            del group_timeout_tasks[key_to_delete]
+
+
+@dp.callback_query(F.data.startswith("pay_partial_"))
+async def pay_with_partial(callback: types.CallbackQuery):
+    """Qisman balans + Click"""
+    invoice_id = callback.data.split("pay_partial_")[1]
+    
+    async for session in get_session():
+        stmt = select(User.language).where(User.telegram_id == callback.from_user.id)
+        lang = (await session.execute(stmt)).scalar() or "uz"
+    
+    # Invoice topish
+    total_price = 0
+    file_count = 0
+    
+    for key, group_data in list(pending_group_files.items()):
+        if group_data.get("invoice_id") == invoice_id:
+            total_price = group_data.get("total_price", 0)
+            file_count = len(group_data.get("files", []))
+            break
+    
+    # User balansini olish
+    async for session in get_session():
+        stmt = select(User).where(User.telegram_id == callback.from_user.id)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        user_balance = user.balance if user else 0.0
+    
+    remaining = total_price - user_balance
+    
+    if remaining < 1000:
+        await callback.answer("❌ Click to'lovi minimal 1000 so'm bo'lishi kerak", show_alert=True)
+        return
+    
+    # Click invoice yuborish (faqat qolgan summa uchun)
+    await callback.message.delete()
+    await send_click_invoice(invoice_id, remaining, file_count, lang, callback.message.chat.id)
+    await callback.answer("💳 Click orqali qolgan summani to'lang")
+
+
+@dp.callback_query(F.data.startswith("pay_click_"))
+async def pay_with_click_only(callback: types.CallbackQuery):
+    """Faqat Click orqali to'lash"""
+    invoice_id = callback.data.split("pay_click_")[1]
+    
+    async for session in get_session():
+        stmt = select(User.language).where(User.telegram_id == callback.from_user.id)
+        lang = (await session.execute(stmt)).scalar() or "uz"
+    
+    # Invoice topish
+    total_price = 0
+    file_count = 0
+    
+    for key, group_data in list(pending_group_files.items()):
+        if group_data.get("invoice_id") == invoice_id:
+            total_price = group_data.get("total_price", 0)
+            file_count = len(group_data.get("files", []))
+            break
+    
+    # Click invoice yuborish
+    await callback.message.delete()
+    await send_click_invoice(invoice_id, total_price, file_count, lang, callback.message.chat.id)
+    await callback.answer("💳 Click orqali to'lang")
+
+
+async def process_conversion(message: types.Message, files_to_convert: list, lang: str):
+    """Fayllarni konvertatsiya qilish"""
+    import os
+    
+    await message.answer(f"📦 {len(files_to_convert)}ta fayl tayyorlanmoqda...")
+    
+    for file_path in files_to_convert:
+        try:
+            txt_path = file_path.replace(".docx", ".txt")
+            result_path = convert_docx_to_txt(file_path, txt_path)
+            
+            # Fayl nomini bot username bilan boshlash
+            original_name = os.path.basename(result_path)
+            clean_name = original_name
+            
+            new_filename = f"@{BOT_INFO.username}_{clean_name}"
+            
+            # Caption yaratish (fayl nomi bilan)
+            # Asl fayl nomini olish (.txt kengaytmasiz)
+            display_name = clean_name.replace(".txt", "")
+            caption = f"{get_text(lang, 'file_ready')}\n\n📝 <b>{display_name}</b>\n\n{get_text(lang, 'converted_via').format(bot_name=BOT_INFO.mention_html(BOT_INFO.first_name))}"
+            
+            await message.answer_document(
+                types.FSInputFile(result_path, filename=new_filename),
+                caption=caption,
+                parse_mode="HTML"
+            )
+            
+            # Fayllarni o'chirish (DOCX va TXT)
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                if os.path.exists(txt_path):
+                    os.remove(txt_path)
+            except Exception as e:
+                print(f"Fayl o'chirishda xatolik: {e}")
+                
+        except Exception as e:
+            await message.answer(f"❌ Xatolik: {file_path} - {e}")
+    
+    # User papkasini o'chirish (bo'sh bo'lsa)
+    try:
+        if files_to_convert:
+            user_folder = os.path.dirname(files_to_convert[0])
+            if os.path.exists(user_folder) and not os.listdir(user_folder):
+                os.rmdir(user_folder)
+    except Exception as e:
+        print(f"Papka o'chirishda xatolik: {e}")
+    
+    await message.answer(get_text(lang, "done"))
 
 
 @dp.pre_checkout_query()
@@ -480,6 +884,7 @@ async def successful_payment(message: types.Message):
         # Payload ni parse qilish
         payload = json.loads(payload_str)
         invoice_id = payload.get("invoice_id")
+        payment_method = payload.get("payment_method", "click")
         
         # Invoice holati tekshirish - duplicate payment oldini olish
         async for session in get_session():
@@ -496,6 +901,36 @@ async def successful_payment(message: types.Message):
                 payment.paid_at = datetime.now()
                 await session.commit()
         
+        # Agar qisman to'lov bo'lsa, balansdan ham yechish kerak
+        if payment_method == "click":
+            # Click to'lovi - balansdan ham yechish mumkin
+            files_to_convert = []
+            total_price = 0
+            
+            for key, group_data in list(pending_group_files.items()):
+                if group_data.get("invoice_id") == invoice_id:
+                    files_to_convert = group_data.get("files", [])
+                    total_price = group_data.get("total_price", 0)
+                    break
+            
+            # Click summasini olish
+            click_amount = message.successful_payment.total_amount / 100
+            
+            # Agar qisman to'lov bo'lsa (Click summa < total_price)
+            if click_amount < total_price:
+                balance_amount = total_price - click_amount
+                
+                # Balansdan yechish
+                async for session in get_session():
+                    stmt = select(User).where(User.telegram_id == message.from_user.id)
+                    result = await session.execute(stmt)
+                    user = result.scalar_one_or_none()
+                    
+                    if user and user.balance >= balance_amount:
+                        user.balance -= balance_amount
+                        await session.commit()
+                        await message.answer(f"💰 Balansdan {balance_amount:,.0f} UZS yechildi")
+        
         await message.answer(get_text(lang, "paid"))
         
         # Invoice_id bo'yicha pending_group_files dan fayllarni topish
@@ -509,16 +944,13 @@ async def successful_payment(message: types.Message):
                 break
         
         if files_to_convert:
-            # Fayllarni konvertatsiya qilish
-            await message.answer(f"📦 {len(files_to_convert)}ta fayl tayyorlanmoqda...")
+            # Payment timeout taskni bekor qilish
+            if key_to_delete and key_to_delete in payment_timeout_tasks:
+                payment_timeout_tasks[key_to_delete].cancel()
+                del payment_timeout_tasks[key_to_delete]
             
-            for file_path in files_to_convert:
-                try:
-                    txt_path = file_path.replace(".docx", ".txt")
-                    result_path = convert_docx_to_txt(file_path, txt_path)
-                    await message.answer_document(types.FSInputFile(result_path))
-                except Exception as e:
-                    await message.answer(f"❌ Xatolik: {file_path} - {e}")
+            # Fayllarni konvertatsiya qilish
+            await process_conversion(message, files_to_convert, lang)
             
             # Pending groupni tozalash
             if key_to_delete:
@@ -527,15 +959,33 @@ async def successful_payment(message: types.Message):
                 if key_to_delete in group_timeout_tasks:
                     del group_timeout_tasks[key_to_delete]
         
-        await message.answer(get_text(lang, "done"))
-        
     except json.JSONDecodeError:
         # Eski format (faqat fayl path) uchun
         await message.answer(get_text(lang, "paid"))
         txt_path = payload_str.replace(".docx", ".txt")
         try:
             result_path = convert_docx_to_txt(payload_str, txt_path)
-            await message.answer_document(types.FSInputFile(result_path))
+            
+            # Fayl nomini bot username bilan boshlash
+            import os
+            original_name = os.path.basename(result_path)
+            # User ID ni olib tashlash
+            if "_" in original_name:
+                clean_name = "_".join(original_name.split("_")[1:])
+            else:
+                clean_name = original_name
+            
+            new_filename = f"@{BOT_INFO.username}_{clean_name}"
+            
+            # Caption yaratish (fayl nomi bilan)
+            display_name = clean_name.replace(".txt", "")
+            caption = f"{get_text(lang, 'file_ready')}\n\n📝 <b>{display_name}</b>\n\n{get_text(lang, 'converted_via').format(bot_name=BOT_INFO.mention_html(BOT_INFO.first_name))}"
+            
+            await message.answer_document(
+                types.FSInputFile(result_path, filename=new_filename),
+                caption=caption,
+                parse_mode="HTML"
+            )
             await message.answer(get_text(lang, "done"))
         except Exception as e:
             await message.answer(f"{get_text(lang, 'error')} {e}")
