@@ -36,7 +36,8 @@ async def admin_settings_handler(callback: CallbackQuery):
         [InlineKeyboardButton(text="💰 Narx Sozlamalari", callback_data="admin_price")],
         [InlineKeyboardButton(text="🎁 Referal Mukofoti", callback_data="admin_referral")],
         [InlineKeyboardButton(text="📊 Referal Statistika", callback_data="admin_referral_stats")],
-        [InlineKeyboardButton(text="🏠 Asosiy Menyu", callback_data="back_to_menu")],
+        [InlineKeyboardButton(text="� Promokodlar", callback_data="admin_promo_menu")],
+        [InlineKeyboardButton(text="�🏠 Asosiy Menyu", callback_data="back_to_menu")],
     ])
 
     try:
@@ -444,6 +445,30 @@ async def referral_stats_handler(callback: CallbackQuery):
         [InlineKeyboardButton(text="🏠 Asosiy Menyu", callback_data="back_to_menu")],
     ])
     
+    try:
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    except:
+        await callback.message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+
+
+# --- PROMOCODE MENU ---
+@router.callback_query(F.data == "admin_promo_menu")
+async def admin_promo_menu_handler(callback: CallbackQuery):
+    """Promocode boshqaruv menyusi"""
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Sizda bu bo'limga kirish huquqi yo'q.", show_alert=True)
+        return
+
+    text = "🎁 *Promokodlar Boshqaruvi*\n\n👇 Qaysi amalni bajarmoqchisiz?"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Yangi promokod yaratish", callback_data="admin_create_promo")],
+        [InlineKeyboardButton(text="📋 Promokodlar ro'yxati", callback_data="admin_promo_list")],
+        [InlineKeyboardButton(text="◀️ Orqaga", callback_data="admin_settings")],
+        [InlineKeyboardButton(text="🏠 Asosiy Menyu", callback_data="back_to_menu")],
+    ])
+
     try:
         await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
     except:

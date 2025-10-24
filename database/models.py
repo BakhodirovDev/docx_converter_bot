@@ -52,3 +52,25 @@ class ReferralHistory(Base):
     referred_id = Column(BigInteger, ForeignKey("users.telegram_id"), index=True)  # Kim kelgan
     reward_amount = Column(Float)  # Qancha pul berilgan
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Promocode(Base):
+    __tablename__ = "promocodes"
+    id = Column(Integer, primary_key=True)
+    code = Column(String(50), unique=True, index=True)  # Promokod
+    reward_amount = Column(Float)  # Mukofot summasi
+    max_uses = Column(Integer, default=1)  # Maksimal foydalanish soni
+    current_uses = Column(Integer, default=0)  # Hozirgi foydalanish soni
+    is_active = Column(Boolean, default=True)  # Faol yoki yo'q
+    created_by = Column(BigInteger, ForeignKey("users.telegram_id"))  # Kim yaratgan (admin)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)  # Amal qilish muddati
+
+
+class PromocodeUsage(Base):
+    __tablename__ = "promocode_usage"
+    id = Column(Integer, primary_key=True)
+    promocode_id = Column(Integer, ForeignKey("promocodes.id"), index=True)
+    user_id = Column(BigInteger, ForeignKey("users.telegram_id"), index=True)
+    reward_amount = Column(Float)
+    used_at = Column(DateTime, default=datetime.utcnow)

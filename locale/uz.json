@@ -35,5 +35,22 @@
   "use_full_balance": "💰 Balansdan to'lash ({balance:,.0f} UZS)",
   "use_partial_balance": "💰 Qisman: Balans ({balance:,.0f}) + Click ({remaining:,.0f})",
   "use_only_click": "💳 Faqat Click orqali to'lash",
-  "payment_timeout": "⏰ To'lov vaqti tugadi!\n\n❌ 30 daqiqa ichida to'lov qilmaganingiz uchun fayllar o'chirib yuborildi.\n\nIltimos, qaytadan fayllarni yuboring va to'lovni amalga oshiring."
+  "payment_timeout": "⏰ To'lov vaqti tugadi!\n\n❌ 30 daqiqa ichida to'lov qilmaganingiz uchun fayllar o'chirib yuborildi.\n\nIltimos, qaytadan fayllarni yuboring va to'lovni amalga oshiring.",
+  "promo_btn": "🎁 Promokod",
+  "promo_enter": "🎁 <b>Promokod kiriting</b>\n\nPromokodni yuboring:",
+  "promo_success": "🎉 Tabriklaymiz!\n\n💰 Balansingizga +{amount:,.0f} UZS qo'shildi!\n📝 Promokod: <code>{code}</code>",
+  "promo_invalid": "❌ Promokod noto'g'ri yoki amal qilish muddati tugagan",
+  "promo_used": "⚠️ Siz bu promokodni allaqachon ishlatgansiz",
+  "promo_limit": "❌ Bu promokod limiti tugagan",
+  "admin_promo": "🎁 Promokodlar",
+  "admin_promo_create": "➕ Yangi promokod yaratish",
+  "admin_promo_list": "📋 Promokodlar ro'yxati",
+  "admin_promo_stats": "📊 Promokod statistikasi",
+  "promo_create_code": "📝 Promokod nomini kiriting:\n\n(Masalan: YANGI2025 yoki AVTO - avtomatik yaratiladi)",
+  "promo_create_amount": "💰 Mukofot summasini kiriting (UZS):\n\n(Masalan: 10000)",
+  "promo_create_uses": "👥 Maksimal foydalanish sonini kiriting:\n\n(Masalan: 100)\n\n0 - cheksiz",
+  "promo_created": "✅ Promokod yaratildi!\n\n📝 Kod: <code>{code}</code>\n💰 Mukofot: {amount:,.0f} UZS\n👥 Foydalanish: {uses} marta\n\nPromokodni tarqatishingiz mumkin!",
+  "promo_list_empty": "📋 Promokodlar ro'yxati bo'sh",
+  "promo_list_item": "📝 <code>{code}</code>\n💰 Mukofot: {amount:,.0f} UZS\n👥 Foydalanildi: {used}/{max}\n📅 Yaratilgan: {date}\n{'✅ Faol' if active else '❌ Nofaol'}\n",
+  "promo_stats": "📊 <b>Promokod statistikasi</b>\n\n📝 Kod: <code>{code}</code>\n💰 Mukofot: {amount:,.0f} UZS\n👥 Foydalanildi: {used}/{max}\n💵 Jami berilgan: {total:,.0f} UZS\n📅 Yaratilgan: {date}\n{'✅ Faol' if active else '❌ Nofaol'}"
 }

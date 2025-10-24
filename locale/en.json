@@ -35,5 +35,22 @@
   "use_full_balance": "💰 Pay from balance ({balance:,.0f} UZS)",
   "use_partial_balance": "💰 Partial: Balance ({balance:,.0f}) + Click ({remaining:,.0f})",
   "use_only_click": "💳 Pay only via Click",
-  "payment_timeout": "⏰ Payment time expired!\n\n❌ Files have been deleted because payment was not made within 30 minutes.\n\nPlease send the files again and make the payment."
+  "payment_timeout": "⏰ Payment time expired!\n\n❌ Files have been deleted because payment was not made within 30 minutes.\n\nPlease send the files again and make the payment.",
+  "promo_btn": "🎁 Promo Code",
+  "promo_enter": "🎁 <b>Enter promo code</b>\n\nEnter your promo code to receive bonus balance:",
+  "promo_success": "🎉 Congratulations!\n\n💰 Your balance has been credited: <b>+{amount:,.0f} UZS</b>\n📝 Promo code: <code>{code}</code>",
+  "promo_invalid": "❌ <b>Invalid promo code</b>\n\nPromo code not found or has expired.",
+  "promo_used": "⚠️ <b>Promo code already used</b>\n\nYou have already activated this promo code before.",
+  "promo_limit": "❌ <b>Limit reached</b>\n\nThis promo code has reached the maximum number of uses.",
+  "admin_promo": "🎁 <b>Promo Code Management</b>",
+  "admin_promo_create": "➕ Create new promo code",
+  "admin_promo_list": "📋 Promo code list",
+  "admin_promo_stats": "📊 Promo code statistics",
+  "promo_create_code": "📝 Enter promo code name:\n\nExample: <code>BONUS2025</code>\n\nOr send <b>AUTO</b> for automatic generation.",
+  "promo_create_amount": "💰 Enter bonus amount (UZS):\n\nExample: 5000",
+  "promo_create_uses": "👥 Enter maximum number of uses:\n\nExample: 10\n\nOr enter <b>0</b> for unlimited uses.",
+  "promo_created": "✅ <b>Promo code created!</b>\n\n📝 Code: <code>{code}</code>\n💰 Amount: {amount:,.0f} UZS\n👥 Uses: {uses}",
+  "promo_list_empty": "📋 <b>Promo code list is empty</b>\n\nYou haven't created any promo codes yet.",
+  "promo_list_item": "📝 <code>{code}</code>\n💰 {amount:,.0f} UZS\n👥 {current}/{max}\n{status}",
+  "promo_stats": "📊 <b>Promo Code Statistics</b>\n\n📝 Total created: {total}\n✅ Active: {active}\n👥 Total uses: {uses}\n💰 Bonuses given: {amount:,.0f} UZS"
 }

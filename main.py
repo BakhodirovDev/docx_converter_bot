@@ -11,6 +11,7 @@ from database.db import get_session, engine
 from database.models import Base, User, Settings, Payment, ReferralHistory
 from handlers.convert import convert_docx_to_txt
 from handlers.admin import router as admin_router
+from handlers.promocode import router as promo_router
 from handlers.referral import generate_referral_code, extract_referral_code
 from utils import ensure_dir, validate_docx, get_text
 
@@ -18,6 +19,7 @@ bot = Bot(BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 dp.include_router(admin_router)
+dp.include_router(promo_router)
 
 ensure_dir("files")
 
@@ -208,6 +210,7 @@ async def set_language(callback: types.CallbackQuery):
 async def send_main_menu(message: types.Message, lang: str):
     buttons = [
         [InlineKeyboardButton(text=get_text(lang, "convert_btn"), callback_data="start_convert")],
+        [InlineKeyboardButton(text=get_text(lang, "promo_btn"), callback_data="enter_promo")],
         [InlineKeyboardButton(text=get_text(lang, "referral_btn"), callback_data="my_referral")],
         [InlineKeyboardButton(text=get_text(lang, "profile_btn"), callback_data="my_profile")]
     ]

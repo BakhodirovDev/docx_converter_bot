@@ -26,7 +26,7 @@ def extract_referral_code(text: str) -> str | None:
         return None
     
     parts = text.split()
-    if len(parts) == 2 and parts[1].startswith("REF"):
+    if len(parts) == 2 and parts[1].startswith("OXUDOCX"):
         return parts[1]
     
     return None
