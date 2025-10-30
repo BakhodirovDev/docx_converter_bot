@@ -9,7 +9,7 @@ from sqlalchemy.future import select
 from config import BOT_TOKEN, PROVIDER_TOKEN, FILE_PRICE, ADMIN_ID, CHANNEL_USERNAME
 from database.db import get_session, engine
 from database.models import Base, User, Settings, Payment, ReferralHistory
-from handlers.convert import convert_docx_to_txt
+from handlers.convert import convert_docx_to_txt, analyze_docx_file
 from handlers.admin import router as admin_router
 from handlers.promocode import router as promo_router
 from handlers.referral import generate_referral_code, extract_referral_code
@@ -450,6 +450,9 @@ async def handle_file(message: types.Message):
         # Faylni yuklab olish
         file_info = await bot.get_file(doc.file_id)
         await bot.download_file(file_info.file_path, destination=file_path)
+        
+        # Faylni tahlil qilish (rasm va formulalarni aniqlash)
+        analysis = analyze_docx_file(file_path)
 
         # Gruh yoki bitta fayl
         user_id = message.from_user.id
@@ -466,6 +469,7 @@ async def handle_file(message: types.Message):
         if key not in pending_group_files:
             pending_group_files[key] = {
                 "files": [],
+                "analyses": [],  # Har bir faylning tahlili
                 "total_price": 0,
                 "lang": lang,
                 "chat_id": message.chat.id
@@ -475,6 +479,7 @@ async def handle_file(message: types.Message):
                 group_timeout_tasks[key].cancel()
         
         pending_group_files[key]["files"].append(file_path)
+        pending_group_files[key]["analyses"].append(analysis)
         pending_group_files[key]["total_price"] += FILE_PRICE
         
         file_count = len(pending_group_files[key]["files"])
@@ -485,20 +490,8 @@ async def handle_file(message: types.Message):
             try:
                 await asyncio.sleep(3.0)  # 3 sekund kutish
                 if key in pending_group_files:
-                    # Admin uchun to'lovsiz konvertatsiya
-                    if message.from_user.id == ADMIN_ID:
-                        data = pending_group_files.get(key)
-                        if data:
-                            files_to_convert = data.get("files", [])
-                            await process_conversion(message, files_to_convert, lang)
-                            # Pending groupni tozalash
-                            if key in pending_group_files:
-                                del pending_group_files[key]
-                            if key in group_timeout_tasks:
-                                del group_timeout_tasks[key]
-                    else:
-                        # Oddiy user uchun to'lov so'rash
-                        await send_group_invoice(key, lang)
+                    # Avval analiz natijalarini ko'rsatish
+                    await show_file_analysis(key, lang, message.from_user.id)
             except asyncio.CancelledError:
                 pass  # Task bekor qilindi, yangi fayllar kelmoqda
             except Exception as e:
@@ -514,6 +507,135 @@ async def handle_file(message: types.Message):
             
     except Exception as e:
         await message.answer(f"❌ Xatolik: {e}")
+
+
+async def show_file_analysis(key: str, lang: str, user_id: int):
+    """Fayl tahlilini ko'rsatish va tasdiqlash so'rash"""
+    data = pending_group_files.get(key)
+    if not data:
+        return
+    
+    analyses = data.get("analyses", [])
+    
+    # Barcha fayllarning umumiy statistikasi
+    total_questions = sum(a['total_questions'] for a in analyses)
+    total_images = sum(a['image_count'] for a in analyses)
+    total_equations = sum(a['equation_count'] for a in analyses)
+    has_problems = any(a['has_images'] or a['has_equations'] for a in analyses)
+    
+    # Muammoli savollar soni
+    problematic_count = len(set(
+        q for a in analyses for q in a['problematic_questions']
+    ))
+    
+    # Agar muammo bo'lsa - ogohlantirish
+    if has_problems:
+        warning_text = get_text(lang, "file_warning").format(
+            total=total_questions,
+            images=total_images,
+            equations=total_equations,
+            problematic=problematic_count
+        )
+        
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text=get_text(lang, "file_confirm_convert"),
+                callback_data=f"confirm_convert_{key}"
+            )],
+            [InlineKeyboardButton(
+                text=get_text(lang, "file_cancel_convert"),
+                callback_data=f"cancel_convert_{key}"
+            )]
+        ])
+        
+        await bot.send_message(
+            chat_id=data["chat_id"],
+            text=warning_text,
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
+    else:
+        # Muammo yo'q - to'g'ridan-to'g'ri to'lov/konvertatsiyaga o'tish
+        if user_id == ADMIN_ID:
+            files_to_convert = data.get("files", [])
+            await process_conversion_direct(data["chat_id"], files_to_convert, lang)
+            # Pending groupni tozalash
+            if key in pending_group_files:
+                del pending_group_files[key]
+            if key in group_timeout_tasks:
+                del group_timeout_tasks[key]
+        else:
+            await send_group_invoice(key, lang)
+
+
+# Tasdiqlash callback
+@dp.callback_query(F.data.startswith("confirm_convert_"))
+async def confirm_convert_handler(callback: types.CallbackQuery):
+    key = callback.data.replace("confirm_convert_", "")
+    
+    data = pending_group_files.get(key)
+    if not data:
+        await callback.answer("❌ Fayl topilmadi yoki vaqt tugadi", show_alert=True)
+        return
+    
+    lang = data["lang"]
+    
+    # Admin uchun to'lovsiz konvertatsiya
+    if callback.from_user.id == ADMIN_ID:
+        files_to_convert = data.get("files", [])
+        await process_conversion_direct(callback.message.chat.id, files_to_convert, lang)
+        await callback.message.delete()
+        # Pending groupni tozalash
+        if key in pending_group_files:
+            del pending_group_files[key]
+        if key in group_timeout_tasks:
+            del group_timeout_tasks[key]
+    else:
+        # Oddiy user uchun to'lov so'rash
+        await callback.message.delete()
+        await send_group_invoice(key, lang)
+    
+    await callback.answer()
+
+
+# Bekor qilish callback
+@dp.callback_query(F.data.startswith("cancel_convert_"))
+async def cancel_convert_handler(callback: types.CallbackQuery):
+    key = callback.data.replace("cancel_convert_", "")
+    
+    data = pending_group_files.get(key)
+    if not data:
+        await callback.answer("❌ Fayl topilmadi", show_alert=True)
+        return
+    
+    lang = data["lang"]
+    
+    # Fayllarni o'chirish
+    files = data.get("files", [])
+    for file_path in files:
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except:
+            pass
+    
+    # User papkasini o'chirish (bo'sh bo'lsa)
+    user_folder = f"files/{callback.from_user.id}"
+    try:
+        if os.path.exists(user_folder) and not os.listdir(user_folder):
+            os.rmdir(user_folder)
+    except:
+        pass
+    
+    # Pending groupni tozalash
+    if key in pending_group_files:
+        del pending_group_files[key]
+    if key in group_timeout_tasks:
+        del group_timeout_tasks[key]
+    
+    await callback.message.delete()
+    await callback.message.answer("❌ Konvertatsiya bekor qilindi. Fayllar o'chirildi.")
+    await callback.answer()
 
 
 async def send_group_invoice(key: str, lang: str):
@@ -866,6 +988,58 @@ async def process_conversion(message: types.Message, files_to_convert: list, lan
         print(f"Papka o'chirishda xatolik: {e}")
     
     await message.answer(get_text(lang, "done"))
+
+
+async def process_conversion_direct(chat_id: int, files_to_convert: list, lang: str):
+    """Fayllarni konvertatsiya qilish (chat_id bilan)"""
+    import os
+    
+    await bot.send_message(chat_id, f"📦 {len(files_to_convert)}ta fayl tayyorlanmoqda...")
+    
+    for file_path in files_to_convert:
+        try:
+            txt_path = file_path.replace(".docx", ".txt")
+            result_path = convert_docx_to_txt(file_path, txt_path)
+            
+            # Fayl nomini bot username bilan boshlash
+            original_name = os.path.basename(result_path)
+            clean_name = original_name
+            
+            new_filename = f"@{BOT_INFO.username}_{clean_name}"
+            
+            # Caption yaratish (fayl nomi bilan)
+            display_name = clean_name.replace(".txt", "")
+            caption = f"{get_text(lang, 'file_ready')}\n\n📝 <b>{display_name}</b>\n\n{get_text(lang, 'converted_via').format(bot_name=BOT_INFO.mention_html(BOT_INFO.first_name))}"
+            
+            await bot.send_document(
+                chat_id=chat_id,
+                document=types.FSInputFile(result_path, filename=new_filename),
+                caption=caption,
+                parse_mode="HTML"
+            )
+            
+            # Fayllarni o'chirish (DOCX va TXT)
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                if os.path.exists(txt_path):
+                    os.remove(txt_path)
+            except Exception as e:
+                print(f"Fayl o'chirishda xatolik: {e}")
+                
+        except Exception as e:
+            await bot.send_message(chat_id, f"❌ Xatolik: {file_path} - {e}")
+    
+    # User papkasini o'chirish (bo'sh bo'lsa)
+    try:
+        if files_to_convert:
+            user_folder = os.path.dirname(files_to_convert[0])
+            if os.path.exists(user_folder) and not os.listdir(user_folder):
+                os.rmdir(user_folder)
+    except Exception as e:
+        print(f"Papka o'chirishda xatolik: {e}")
+    
+    await bot.send_message(chat_id, get_text(lang, "done"))
 
 
 @dp.pre_checkout_query()

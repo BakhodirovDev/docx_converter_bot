@@ -52,5 +52,8 @@
   "promo_created": "✅ <b>Promo code created!</b>\n\n📝 Code: <code>{code}</code>\n💰 Amount: {amount:,.0f} UZS\n👥 Uses: {uses}",
   "promo_list_empty": "📋 <b>Promo code list is empty</b>\n\nYou haven't created any promo codes yet.",
   "promo_list_item": "📝 <code>{code}</code>\n💰 {amount:,.0f} UZS\n👥 {current}/{max}\n{status}",
-  "promo_stats": "📊 <b>Promo Code Statistics</b>\n\n📝 Total created: {total}\n✅ Active: {active}\n👥 Total uses: {uses}\n💰 Bonuses given: {amount:,.0f} UZS"
+  "promo_stats": "📊 <b>Promo Code Statistics</b>\n\n📝 Total created: {total}\n✅ Active: {active}\n👥 Total uses: {uses}\n💰 Bonuses given: {amount:,.0f} UZS",
+  "file_warning": "⚠️ <b>Warning!</b>\n\n📄 Total questions: <b>{total}</b>\n🖼 Images: <b>{images}</b>\n📐 Equations: <b>{equations}</b>\n\n❌ <b>{problematic}</b> questions contain images or equations!\n\nThese questions may not be fully copied. Text will be copied, but images and equations won't be saved in TXT format.\n\n💡 <b>Tip:</b> Convert equations and images to plain text or save in PDF format.\n\nContinue?",
+  "file_confirm_convert": "✅ Yes, continue",
+  "file_cancel_convert": "❌ No, cancel"
 }

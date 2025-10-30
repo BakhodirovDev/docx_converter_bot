@@ -52,5 +52,8 @@
   "promo_created": "✅ Promokod yaratildi!\n\n📝 Kod: <code>{code}</code>\n💰 Mukofot: {amount:,.0f} UZS\n👥 Foydalanish: {uses} marta\n\nPromokodni tarqatishingiz mumkin!",
   "promo_list_empty": "📋 Promokodlar ro'yxati bo'sh",
   "promo_list_item": "📝 <code>{code}</code>\n💰 Mukofot: {amount:,.0f} UZS\n👥 Foydalanildi: {used}/{max}\n📅 Yaratilgan: {date}\n{'✅ Faol' if active else '❌ Nofaol'}\n",
-  "promo_stats": "📊 <b>Promokod statistikasi</b>\n\n📝 Kod: <code>{code}</code>\n💰 Mukofot: {amount:,.0f} UZS\n👥 Foydalanildi: {used}/{max}\n💵 Jami berilgan: {total:,.0f} UZS\n📅 Yaratilgan: {date}\n{'✅ Faol' if active else '❌ Nofaol'}"
+  "promo_stats": "📊 <b>Promokod statistikasi</b>\n\n📝 Kod: <code>{code}</code>\n💰 Mukofot: {amount:,.0f} UZS\n👥 Foydalanildi: {used}/{max}\n💵 Jami berilgan: {total:,.0f} UZS\n📅 Yaratilgan: {date}\n{'✅ Faol' if active else '❌ Nofaol'}",
+  "file_warning": "⚠️ <b>Diqqat!</b>\n\n📄 Jami savollar: <b>{total}</b> ta\n🖼 Rasmlar: <b>{images}</b> ta\n📐 Formulalar: <b>{equations}</b> ta\n\n❌ <b>{problematic}</b> ta savolda rasm yoki formula bor!\n\nBu savollar to'liq ko'chmasligi mumkin. Matnlar ko'chiriladi, lekin rasmlar va formulalar TXT formatda saqlanmaydi.\n\n💡 <b>Maslahat:</b> Formulalar va rasmlarni oddiy matnga aylantiring.\n\nDavom etasizmi?",
+  "file_confirm_convert": "✅ Ha, davom etish",
+  "file_cancel_convert": "❌ Yo'q, bekor qilish"
 }
